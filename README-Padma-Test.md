@@ -17,12 +17,14 @@ This application can be accessed via [Link] (https://herb.canopygrowth.com/?sign
 
 The Membership column contains the following segments: 
 
-<ul>**Manage Members**</ul>
-<ul>**Manage Groups**</ul>
-<ul>**Invitations**</ul>
-<ul>**Points and Status**</ul>
-<ul>**Public Registration**</ul> 
-<ul>**Sign In Settings**</ul>
+<ol>
+<li>Manage Members</li>
+<li>Manage Groups</li>
+<li>Invitations</li>
+<li>Points and Status</li>
+<li>Public Registration</li> 
+<li>Sign In Settings</li>
+</ol>
 
 ## License
 
