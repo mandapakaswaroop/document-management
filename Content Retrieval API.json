@@ -1,0 +1,418 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Content Retrieval API",
+    "version": "1.0.0",
+    "description": "Fetch structured documentation segments for online help. Supports keyword search, topic-scoped listing, and retrieval by ID. Responses include citations-ready fields and metadata."
+  },
+  "servers": [
+    {
+      "url": "https://api.example.com",
+      "description": "Production"
+    },
+    {
+      "url": "https://staging.api.example.com",
+      "description": "Staging"
+    }
+  ],
+  "tags": [
+    { "name": "Segments", "description": "Search and retrieve documentation segments" },
+    { "name": "Topics", "description": "Access segments grouped by topic" }
+  ],
+  "paths": {
+    "/v1/segments": {
+      "get": {
+        "tags": ["Segments"],
+        "summary": "Search documentation segments",
+        "operationId": "searchSegments",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "query",
+            "required": true,
+            "schema": { "type": "string", "minLength": 1 },
+            "description": "Keyword(s) to search in title, summary, steps, and tags",
+            "example": "configure settings"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 10 },
+            "description": "Max results to return"
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "schema": { "type": "integer", "minimum": 0, "default": 0 },
+            "description": "Result offset for pagination"
+          },
+          {
+            "in": "query",
+            "name": "topicId",
+            "schema": { "type": "string" },
+            "description": "Optional filter to a specific topic"
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "schema": { "type": "string" },
+            "description": "Optional product/doc version filter (e.g., v3.2)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SearchResponse" },
+                "examples": {
+                  "ok": {
+                    "summary": "Successful keyword search",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "seg_10293",
+                          "title": "Configure Settings",
+                          "topicId": "topic_configuration",
+                          "content": {
+                            "summary": "Steps to configure settings in the admin console.",
+                            "steps": [
+                              "Open Admin > Settings",
+                              "Select Environment",
+                              "Click Save"
+                            ],
+                            "examples": [
+                              {
+                                "title": "Configure for QA",
+                                "body": "Admin > Settings > Environment: QA"
+                              }
+                            ]
+                          },
+                          "metadata": {
+                            "version": "v3.2",
+                            "product": "P360",
+                            "tags": ["configuration", "admin"],
+                            "lastUpdated": "2026-02-01T10:25:00Z"
+                          }
+                        }
+                      ],
+                      "page": { "limit": 10, "offset": 0, "total": 1 }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/v1/segments/{id}": {
+      "get": {
+        "tags": ["Segments"],
+        "summary": "Get segment by ID",
+        "operationId": "getSegmentById",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Segment ID",
+            "example": "seg_10293"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Segment found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SegmentResponse" },
+                "examples": {
+                  "ok": {
+                    "summary": "Single segment",
+                    "value": {
+                      "data": {
+                        "id": "seg_10293",
+                        "title": "Configure Settings",
+                        "topicId": "topic_configuration",
+                        "content": {
+                          "summary": "Steps to configure settings in the admin console.",
+                          "steps": [
+                            "Open Admin > Settings",
+                            "Select Environment",
+                            "Click Save"
+                          ],
+                          "examples": [
+                            {
+                              "title": "Configure for QA",
+                              "body": "Admin > Settings > Environment: QA"
+                            }
+                          ]
+                        },
+                        "metadata": {
+                          "version": "v3.2",
+                          "product": "P360",
+                          "tags": ["configuration", "admin"],
+                          "lastUpdated": "2026-02-01T10:25:00Z"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/v1/topics/{topicId}/segments": {
+      "get": {
+        "tags": ["Topics"],
+        "summary": "List segments for a topic",
+        "operationId": "listSegmentsByTopic",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "topicId",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Topic identifier",
+            "example": "topic_configuration"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": { "type": "integer", "default": 10, "minimum": 1, "maximum": 100 }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "schema": { "type": "integer", "default": 0, "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Topic segments",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SearchResponse" },
+                "examples": {
+                  "ok": {
+                    "summary": "Segments in topic",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "seg_10293",
+                          "title": "Configure Settings",
+                          "topicId": "topic_configuration",
+                          "content": {
+                            "summary": "Steps to configure settings in the admin console.",
+                            "steps": [
+                              "Open Admin > Settings",
+                              "Select Environment",
+                              "Click Save"
+                            ]
+                          },
+                          "metadata": {
+                            "version": "v3.2",
+                            "product": "P360",
+                            "tags": ["configuration"],
+                            "lastUpdated": "2026-02-01T10:25:00Z"
+                          }
+                        }
+                      ],
+                      "page": { "limit": 10, "offset": 0, "total": 1 }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Provide a valid JWT access token in the Authorization header."
+      }
+    },
+    "schemas": {
+      "Segment": {
+        "type": "object",
+        "required": ["id", "title", "topicId", "content", "metadata"],
+        "properties": {
+          "id": { "type": "string", "example": "seg_10293" },
+          "title": { "type": "string", "example": "Configure Settings" },
+          "topicId": { "type": "string", "example": "topic_configuration" },
+          "content": { "$ref": "#/components/schemas/SegmentContent" },
+          "metadata": { "$ref": "#/components/schemas/SegmentMetadata" }
+        }
+      },
+      "SegmentContent": {
+        "type": "object",
+        "properties": {
+          "summary": { "type": "string", "example": "Steps to configure settings in the admin console." },
+          "steps": {
+            "type": "array",
+            "items": { "type": "string" },
+            "example": ["Open Admin > Settings", "Select Environment", "Click Save"]
+          },
+          "examples": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": { "type": "string", "example": "Configure for QA" },
+                "body": { "type": "string", "example": "Admin > Settings > Environment: QA" }
+              }
+            }
+          }
+        }
+      },
+      "SegmentMetadata": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "string", "example": "v3.2" },
+          "product": { "type": "string", "example": "P360" },
+          "tags": { "type": "array", "items": { "type": "string" }, "example": ["configuration", "admin"] },
+          "lastUpdated": { "type": "string", "format": "date-time", "example": "2026-02-01T10:25:00Z" }
+        }
+      },
+      "PageInfo": {
+        "type": "object",
+        "properties": {
+          "limit": { "type": "integer", "example": 10 },
+          "offset": { "type": "integer", "example": 0 },
+          "total": { "type": "integer", "example": 1 }
+        }
+      },
+      "SearchResponse": {
+        "type": "object",
+        "properties": {
+          "data": { "type": "array", "items": { "$ref": "#/components/schemas/Segment" } },
+          "page": { "$ref": "#/components/schemas/PageInfo" }
+        }
+      },
+      "SegmentResponse": {
+        "type": "object",
+        "properties": {
+          "data": { "$ref": "#/components/schemas/Segment" }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["code", "message"],
+        "properties": {
+          "code": { "type": "string", "example": "NOT_FOUND" },
+          "message": { "type": "string", "example": "Segment not found" },
+          "details": { "type": "object" }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Invalid request parameters",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "examples": {
+              "badQuery": {
+                "summary": "Missing query",
+                "value": { "code": "BAD_REQUEST", "message": "query is required" }
+              }
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Missing or invalid token",
+        "headers": {
+          "WWW-Authenticate": {
+            "schema": { "type": "string" },
+            "description": "Bearer realm=\"api\""
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "examples": {
+              "noToken": {
+                "summary": "No auth",
+                "value": { "code": "UNAUTHORIZED", "message": "Authorization header missing" }
+              }
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "examples": {
+              "segmentMissing": {
+                "summary": "Unknown segment",
+                "value": { "code": "NOT_FOUND", "message": "Segment not found" }
+              }
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Rate limit exceeded",
+        "headers": {
+          "Retry-After": {
+            "schema": { "type": "integer" },
+            "description": "Seconds until the client may retry"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "examples": {
+              "rateLimited": {
+                "summary": "Burst traffic",
+                "value": { "code": "RATE_LIMITED", "message": "Too many requests. Try again later." }
+              }
+            }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "Unexpected server error",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "examples": {
+              "oops": {
+                "summary": "Generic 500",
+                "value": { "code": "INTERNAL_ERROR", "message": "Something went wrong" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "security": [{ "bearerAuth": [] }]
+}

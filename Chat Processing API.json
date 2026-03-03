@@ -1,0 +1,313 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Chat Processing API",
+    "version": "1.0.0",
+    "description": "Process user questions using AI, retrieve relevant documentation segments via the Content Retrieval API, and return readable, cited answers. Includes feedback capture for continuous improvement."
+  },
+  "servers": [
+    { "url": "https://api.example.com", "description": "Production" },
+    { "url": "https://staging.api.example.com", "description": "Staging" }
+  ],
+  "tags": [
+    { "name": "Chat", "description": "Question answering and feedback" }
+  ],
+  "paths": {
+    "/v1/ask": {
+      "post": {
+        "tags": ["Chat"],
+        "summary": "Ask a question and receive an AI-generated answer with citations",
+        "operationId": "askQuestion",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AskRequest" },
+              "examples": {
+                "simple": {
+                  "summary": "Basic question with topic context",
+                  "value": {
+                    "question": "How do I configure settings?",
+                    "context": { "topicId": "topic_configuration" },
+                    "options": { "maxSegments": 3, "format": "markdown" }
+                  }
+                },
+                "pageContext": {
+                  "summary": "Question scoped to the current help page",
+                  "value": {
+                    "question": "What does environment selection do?",
+                    "context": { "pageUrl": "https://docs.example.com/help/config" },
+                    "options": { "temperature": 0.2 }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Answer generated successfully",
+            "headers": {
+              "X-Request-Id": { "schema": { "type": "string" }, "description": "Trace identifier for debugging" }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AskResponse" },
+                "examples": {
+                  "ok": {
+                    "summary": "Answer with citations and follow-ups",
+                    "value": {
+                      "answer": "Go to **Admin > Settings**. Choose an environment and click **Save**.",
+                      "citations": [
+                        { "segmentId": "seg_10293", "title": "Configure Settings", "url": "https://docs.example.com/topics/topic_configuration#seg_10293" }
+                      ],
+                      "followUps": ["How to manage environments?"],
+                      "meta": { "model": "gpt-enterprise", "latencyMs": 850 }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/v1/feedback": {
+      "post": {
+        "tags": ["Chat"],
+        "summary": "Submit feedback for a previous answer",
+        "operationId": "submitFeedback",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/FeedbackRequest" },
+              "examples": {
+                "thumbsDown": {
+                  "summary": "Negative feedback with comment",
+                  "value": {
+                    "requestId": "req_7f3dbb9",
+                    "rating": "down",
+                    "comment": "Missed the environment pre-requisite",
+                    "labels": ["accuracy"],
+                    "user": { "id": "user_123", "role": "customer" }
+                  }
+                },
+                "thumbsUp": {
+                  "summary": "Positive feedback only",
+                  "value": { "requestId": "req_7f3dbb9", "rating": "up" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Feedback accepted for processing",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FeedbackResponse" },
+                "examples": {
+                  "accepted": {
+                    "value": { "status": "accepted", "requestId": "req_7f3dbb9" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Provide JWT in Authorization header: Bearer <token>"
+      }
+    },
+    "schemas": {
+      "AskRequest": {
+        "type": "object",
+        "required": ["question"],
+        "properties": {
+          "question": { "type": "string", "minLength": 1, "example": "How do I configure settings?" },
+          "context": { "$ref": "#/components/schemas/Context" },
+          "options": { "$ref": "#/components/schemas/AskOptions" }
+        }
+      },
+      "Context": {
+        "type": "object",
+        "properties": {
+          "topicId": { "type": "string", "example": "topic_configuration" },
+          "pageUrl": { "type": "string", "format": "uri", "example": "https://docs.example.com/help/config" },
+          "userLocale": { "type": "string", "example": "en-US" }
+        }
+      },
+      "AskOptions": {
+        "type": "object",
+        "properties": {
+          "maxSegments": { "type": "integer", "default": 3, "minimum": 1, "maximum": 10 },
+          "format": { "type": "string", "enum": ["markdown", "plaintext"], "default": "markdown" },
+          "temperature": { "type": "number", "format": "float", "minimum": 0, "maximum": 1, "default": 0.2 }
+        }
+      },
+      "AskResponse": {
+        "type": "object",
+        "required": ["answer"],
+        "properties": {
+          "answer": { "type": "string", "example": "Go to **Admin > Settings**. Choose an environment and click **Save**." },
+          "citations": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Citation" },
+            "example": [
+              { "segmentId": "seg_10293", "title": "Configure Settings", "url": "https://docs.example.com/topics/topic_configuration#seg_10293" }
+            ]
+          },
+          "followUps": {
+            "type": "array",
+            "items": { "type": "string" },
+            "example": ["How to manage environments?"]
+          },
+          "meta": { "$ref": "#/components/schemas/ChatMeta" }
+        }
+      },
+      "Citation": {
+        "type": "object",
+        "required": ["segmentId"],
+        "properties": {
+          "segmentId": { "type": "string", "example": "seg_10293" },
+          "title": { "type": "string", "example": "Configure Settings" },
+          "url": { "type": "string", "format": "uri" }
+        }
+      },
+      "ChatMeta": {
+        "type": "object",
+        "properties": {
+          "model": { "type": "string", "example": "gpt-enterprise" },
+          "latencyMs": { "type": "integer", "example": 850 },
+          "usedSegments": { "type": "integer", "example": 3 }
+        }
+      },
+      "FeedbackRequest": {
+        "type": "object",
+        "required": ["requestId", "rating"],
+        "properties": {
+          "requestId": { "type": "string", "example": "req_7f3dbb9" },
+          "rating": { "type": "string", "enum": ["up", "down"], "example": "down" },
+          "comment": { "type": "string", "example": "Missed the environment pre-requisite" },
+          "labels": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["accuracy", "completeness", "tone", "formatting"] },
+            "example": ["accuracy"]
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "example": "user_123" },
+              "role": { "type": "string", "example": "customer" }
+            }
+          }
+        }
+      },
+      "FeedbackResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "example": "accepted" },
+          "requestId": { "type": "string", "example": "req_7f3dbb9" }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["code", "message"],
+        "properties": {
+          "code": { "type": "string", "example": "BAD_REQUEST" },
+          "message": { "type": "string", "example": "question is required" },
+          "details": { "type": "object" }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Invalid request parameters",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "examples": {
+              "missingQuestion": {
+                "value": { "code": "BAD_REQUEST", "message": "question is required" }
+              }
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Missing or invalid token",
+        "headers": {
+          "WWW-Authenticate": {
+            "schema": { "type": "string" },
+            "description": "Bearer realm=\"api\""
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "examples": {
+              "noToken": { "value": { "code": "UNAUTHORIZED", "message": "Authorization header missing" } }
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Related resources not found",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "examples": {
+              "noContext": { "value": { "code": "NOT_FOUND", "message": "No matching content found" } }
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Rate limit exceeded",
+        "headers": {
+          "Retry-After": { "schema": { "type": "integer" }, "description": "Seconds to wait before retry" }
+        },
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "examples": {
+              "rateLimited": { "value": { "code": "RATE_LIMITED", "message": "Too many requests. Try again later." } }
+            }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "Unexpected server error",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "examples": {
+              "oops": { "value": { "code": "INTERNAL_ERROR", "message": "Something went wrong" } }
+            }
+          }
+        }
+      }
+    }
+  },
+  "security": [{ "bearerAuth": [] }]
+}
